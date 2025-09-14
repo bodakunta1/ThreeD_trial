@@ -32,4 +32,3 @@ class ModelUploadForm(forms.ModelForm):
                     )
         return file
     
-    

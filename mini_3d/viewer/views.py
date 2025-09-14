@@ -8,11 +8,16 @@ import json
 def home(request):
     """Main viewer page with all 3D models"""
     models = ThreeDModel.objects.all()
+
+     # Debug: Print models in console
+    print(f"🔍 Found {models.count()} models in database:")
+    for model in models:
+        print(f"  - ID: {model.id}, Name: {model.name}, File: {model.model_file.url}")
     
     # Prepare models data for JavaScript
     models_data = []
     for model in models:
-        models_data.append({
+        model_dict = {
             'id': model.id,
             'name': model.name,
             'url': model.model_file.url,
@@ -23,7 +28,9 @@ def home(request):
                 'y': model.position_y,
                 'z': model.position_z
             }
-        })
+        }
+        models_data.append(model_dict)
+        print(f"  -  Added to JS : {model_dict}")
     
     context = {
         'models': models,

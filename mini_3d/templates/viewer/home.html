@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}3D Model Viewer{% endblock %}
+
+{% block content %}
+<h1>3D Model Viewer</h1>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div id="scene-container">
+            <div class="model-info" id="model-info">
+                <h6>Model Information</h6>
+                <p id="current-model">No model selected - Scene ready</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <h3>Available Models</h3>
+        
+        <!-- Test Button for Debugging -->
+        <div class="mb-3">
+            <button class="btn btn-warning" onclick="testButton()">🔧 Test Button (Click Me First)</button>
+            <button class="btn btn-info" onclick="testThreeJS()">🧪 Test Three.js</button>
+            <!-- Add this debug button right after the other test buttons -->
+            <button class="btn btn-secondary" onclick="debugModelsData()">🔍 Debug Models Data</button>
+        </div>
+        
+        <div class="row">
+            {% for model in models %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ model.name }}</h5>
+                        <p class="card-text">{{ model.description|truncatewords:20 }}</p>
+                        <p class="text-muted">Format: {{ model.get_format_display }}</p>
+                        <button class="btn btn-primary" onclick="loadModel('{{ model.id }}')">
+                            Load Model
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h4>Welcome to Mini 3D Viewer!</h4>
+                    <p>No 3D models available yet. <a href="{% url 'viewer:upload_model' %}" class="btn btn-success">Upload your first 3D model</a></p>
+                    <p><small>You can download test models from: <a href="https://github.com/KhronosGroup/glTF-Sample-Models" target="_blank">glTF Sample Models</a></small></p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Working CDN Three.js Files -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+console.log('🚀 Starting Three.js initialization...');
+
+// Pass Django data to JavaScript
+const modelsData = JSON.parse('{{ models_json|escapejs }}');
+console.log('📊 Models data from Django:', modelsData);
+
+// Three.js scene variables
+let scene, camera, renderer, controls;
+let loadedModels = [];
+
+// Test functions for debugging
+function testButton() {
+    alert('✅ Button clicks are working!');
+    console.log('✅ Test button clicked successfully');
+}
+
+function testThreeJS() {
+    if (typeof THREE !== 'undefined') {
+        alert('✅ Three.js is loaded! Version: ' + THREE.REVISION);
+        console.log('✅ Three.js loaded successfully, version:', THREE.REVISION);
+    } else {
+        alert('❌ Three.js is NOT loaded!');
+        console.error('❌ Three.js is not loaded');
+    }
+}
+
+function initScene() {
+    try {
+        console.log('🎬 Initializing Three.js scene...');
+        
+        // Check if THREE is loaded
+        if (typeof THREE === 'undefined') {
+            throw new Error('Three.js is not loaded');
+        }
+        
+        // Create scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x202020);
+        
+        // Create camera
+        const container = document.getElementById('scene-container');
+        if (!container) {
+            throw new Error('Scene container not found');
+        }
+        
+        camera = new THREE.PerspectiveCamera(
+            75, 
+            container.offsetWidth / container.offsetHeight, 
+            0.1, 
+            1000
+        );
+        camera.position.set(5, 5, 5);
+        
+        // Create renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.offsetWidth, container.offsetHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        // Clear container and add canvas
+        container.innerHTML = '<div class="model-info" id="model-info"><h6>Model Information</h6><p id="current-model">Scene initialized - Ready to load models!</p></div>';
+        container.appendChild(renderer.domElement);
+        
+        // Add controls
+        if (typeof THREE.OrbitControls === 'undefined') {
+            console.warn('⚠️ OrbitControls not loaded, using basic camera');
+        } else {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+        }
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+        
+        // Add ground plane
+        const groundGeometry = new THREE.PlaneGeometry(20, 20);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // Add a test cube
+        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const cubeMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.position.set(0, 0.5, 0);
+        cube.castShadow = true;
+        scene.add(cube);
+        
+        console.log('✅ Scene initialized successfully!');
+        animate();
+        
+    } catch (error) {
+        console.error('❌ Error initializing scene:', error);
+        document.getElementById('current-model').textContent = 'Error: ' + error.message;
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    if (controls) {
+        controls.update();
+    }
+    
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
+}
+
+function loadModel(modelId) {
+    try {
+        console.log('🎯 Loading model with ID:', modelId);
+        console.log('🔍 Available models:', modelsData.map(m => ({ id: m.id, name: m.name })));
+        
+        // Check if GLTFLoader is available
+        if (typeof THREE.GLTFLoader === 'undefined') {
+            throw new Error('GLTFLoader is not loaded');
+        }
+
+        // Convert both IDs to strings fro comparison
+        const modelData = modelsData.find(m => String(m.id) === String(modelId));
+
+        if (!modelData) {
+            // Show available models for debugging
+            const availableIds = modelsData.map(m => m.id).join(', ');
+            throw new Error(`Model data not found for ID: ${modelId}. Available IDs: [${availableIds}]`);
+        }
+        
+        console.log('📦 Model data found:', modelData);
+        
+        // Clear existing loaded models
+        loadedModels.forEach(model => scene.remove(model));
+        loadedModels = [];
+        
+        // Update status
+        document.getElementById('current-model').textContent = 'Loading: ' + modelData.name + '...';
+        
+        // Load new model
+        const loader = new THREE.GLTFLoader();
+        console.log('📥 Starting model load from:', modelData.url);
+        
+        loader.load(
+            modelData.url,
+            function(gltf) {
+                console.log('✅ Model loaded successfully:', gltf);
+                
+                const model = gltf.scene;
+                
+                // Apply transformations
+                model.scale.setScalar(modelData.scale || 1.0);
+                model.position.set(
+                    modelData.position.x || 0,
+                    modelData.position.y || 0,
+                    modelData.position.z || 0
+                );
+                
+                // Enable shadows
+                model.traverse(function(child) {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                
+                scene.add(model);
+                loadedModels.push(model);
+                
+                document.getElementById('current-model').textContent = 'Loaded: ' + modelData.name;
+                console.log('🎉 Model successfully added to scene');
+            },
+            function(progress) {
+                console.log('📈 Loading progress:', progress);
+                if (progress.total) {
+                    const percent = Math.round((progress.loaded / progress.total) * 100);
+                    document.getElementById('current-model').textContent = 'Loading: ' + percent + '%';
+                }
+            },
+            function(error) {
+                console.error('❌ Error loading model:', error);
+                document.getElementById('current-model').textContent = 'Error loading model';
+                alert('Error loading 3D model: ' + error.message + '\n\nCheck the console for details.');
+            }
+        );
+        
+    } catch (error) {
+        console.error('❌ Error in loadModel function:', error);
+        document.getElementById('current-model').textContent = 'Error: ' + error.message;
+        alert('Error: ' + error.message);
+    }
+}
+
+
+function debugModelsData() {
+    console.log('🔍 Full modelsData array:', modelsData);
+    console.log('🔢 Number of models:', modelsData.length);
+    
+    if (modelsData.length > 0) {
+        modelsData.forEach((model, index) => {
+            console.log(`📦 Model ${index}:`, {
+                id: model.id,
+                name: model.name,
+                url: model.url,
+                format: model.format
+            });
+        });
+        alert(`Found ${modelsData.length} models. Check console for details.`);
+    } else {
+        alert('❌ No models found in modelsData array!');
+    }
+}
+
+// Add this to the global functions section
+window.debugModelsData = debugModelsData;
+
+
+// Handle window resize
+window.addEventListener('resize', function() {
+    if (camera && renderer) {
+        const container = document.getElementById('scene-container');
+        camera.aspect = container.offsetWidth / container.offsetHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.offsetWidth, container.offsetHeight);
+    }
+});
+
+// Initialize scene when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📋 DOM loaded, initializing scene...');
+    initScene();
+});
+
+// Make functions globally accessible
+window.loadModel = loadModel;
+window.testButton = testButton;
+window.testThreeJS = testThreeJS;
+
+console.log('🔧 Script setup complete');
+</script>
+{% endblock %}

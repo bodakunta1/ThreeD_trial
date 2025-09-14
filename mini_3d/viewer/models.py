@@ -25,6 +25,10 @@ class ThreeDModel(models.Model):
     position_z = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "ThreeDModel"
+        verbose_name_plural = "ThreeDModel"
     
     def __str__(self):
         return self.name

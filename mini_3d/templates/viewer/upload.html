@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload 3D Model{% endblock %}
+
+{% block content %}
+<h1>Upload 3D Model</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="{{ form.name.id_for_label }}" class="form-label">Model Name</label>
+                {{ form.name }}
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                {{ form.description }}
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.model_file.id_for_label }}" class="form-label">3D Model File</label>
+                {{ form.model_file }}
+                <div class="form-text">Supported formats: GLTF (.gltf), GLB (.glb), OBJ (.obj)</div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="{{ form.format.id_for_label }}" class="form-label">Format</label>
+                {{ form.format }}
+            </div>
+            
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="{{ form.scale.id_for_label }}" class="form-label">Scale</label>
+                        {{ form.scale }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="{{ form.position_x.id_for_label }}" class="form-label">Position X</label>
+                        {{ form.position_x }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="{{ form.position_y.id_for_label }}" class="form-label">Position Y</label>
+                        {{ form.position_y }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label for="{{ form.position_z.id_for_label }}" class="form-label">Position Z</label>
+                        {{ form.position_z }}
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Upload Model</button>
+            <a href="{% url 'viewer:home' %}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+    
+    <!-- Sidebar card showing supported 3D formats 
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Supported 3D Formats</h5>
+            </div>
+            <div class="card-body">
+                <ul>
+                    <li><strong>GLTF (.gltf)</strong> - JSON-based format</li>
+                    <li><strong>GLB (.glb)</strong> - Binary GLTF format</li>
+                    <li><strong>OBJ (.obj)</strong> - Wavefront OBJ format</li>
+                </ul>
+            </div>
+        </div>
+    </div> -->
+</div>
+{% endblock %}
