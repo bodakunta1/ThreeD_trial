@@ -26,7 +26,7 @@ class ModelUploadForm(forms.ModelForm):
                 raise forms.ValidationError(
                     "Unsupported file extension. Allowed extensions are: .gltf, .glb, .obj"
                     )
-            if file.size > 50 *1024 *1024:  # 50 MB limit
+            if file.size > 100 *1024 *1024:  # 100 MB limit
                 raise forms.ValidationError(
                     "File size exceeds the limit of 50MB."
                     )

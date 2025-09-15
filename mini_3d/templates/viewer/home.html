@@ -11,7 +11,7 @@
         <div id="scene-container">
             <div class="model-info" id="model-info">
                 <h6>Model Information</h6>
-                <p id="current-model">No model selected - Scene ready</p>
+                <p id="current-model">Scene initialized - Ready to load models!</p>
             </div>
         </div>
     </div>
@@ -21,12 +21,10 @@
     <div class="col-md-12">
         <h3>Available Models</h3>
         
-        <!-- Test Button for Debugging -->
+        <!-- Control buttons -->
         <div class="mb-3">
-            <button class="btn btn-warning" onclick="testButton()">🔧 Test Button (Click Me First)</button>
-            <button class="btn btn-info" onclick="testThreeJS()">🧪 Test Three.js</button>
-            <!-- Add this debug button right after the other test buttons -->
-            <button class="btn btn-secondary" onclick="debugModelsData()">🔍 Debug Models Data</button>
+            <button class="btn btn-light" onclick="enhanceForDarkModels()">💡 Dark Model Mode</button>
+            <button class="btn btn-secondary" onclick="resetLighting()">🔄 Reset Lighting</button>
         </div>
         
         <div class="row">
@@ -37,7 +35,9 @@
                         <h5 class="card-title">{{ model.name }}</h5>
                         <p class="card-text">{{ model.description|truncatewords:20 }}</p>
                         <p class="text-muted">Format: {{ model.get_format_display }}</p>
-                        <button class="btn btn-primary" onclick="loadModel('{{ model.id }}')">
+                        
+                        <!-- Only Load Model Button (Delete Removed) -->
+                        <button class="btn btn-primary w-100" onclick="loadModel({{ model.id }})">
                             Load Model
                         </button>
                     </div>
@@ -48,7 +48,6 @@
                 <div class="alert alert-info">
                     <h4>Welcome to Mini 3D Viewer!</h4>
                     <p>No 3D models available yet. <a href="{% url 'viewer:upload_model' %}" class="btn btn-success">Upload your first 3D model</a></p>
-                    <p><small>You can download test models from: <a href="https://github.com/KhronosGroup/glTF-Sample-Models" target="_blank">glTF Sample Models</a></small></p>
                 </div>
             </div>
             {% endfor %}
@@ -66,42 +65,30 @@
 <script>
 console.log('🚀 Starting Three.js initialization...');
 
-// Pass Django data to JavaScript
-const modelsData = JSON.parse('{{ models_json|escapejs }}');
+// Pass Django data to JavaScript and ensure IDs are numbers
+const modelsData = {{ models_json|safe }};
+modelsData.forEach(model => {
+    model.id = parseInt(model.id);
+});
+
 console.log('📊 Models data from Django:', modelsData);
 
 // Three.js scene variables
 let scene, camera, renderer, controls;
 let loadedModels = [];
 
-// Test functions for debugging
-function testButton() {
-    alert('✅ Button clicks are working!');
-    console.log('✅ Test button clicked successfully');
-}
-
-function testThreeJS() {
-    if (typeof THREE !== 'undefined') {
-        alert('✅ Three.js is loaded! Version: ' + THREE.REVISION);
-        console.log('✅ Three.js loaded successfully, version:', THREE.REVISION);
-    } else {
-        alert('❌ Three.js is NOT loaded!');
-        console.error('❌ Three.js is not loaded');
-    }
-}
 
 function initScene() {
     try {
         console.log('🎬 Initializing Three.js scene...');
         
-        // Check if THREE is loaded
         if (typeof THREE === 'undefined') {
             throw new Error('Three.js is not loaded');
         }
         
         // Create scene
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x202020);
+        scene.background = new THREE.Color(0x2a2a2a);
         
         // Create camera
         const container = document.getElementById('scene-container');
@@ -115,53 +102,76 @@ function initScene() {
             0.1, 
             1000
         );
-        camera.position.set(5, 5, 5);
+        camera.position.set(8, 6, 8);
         
         // Create renderer
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(container.offsetWidth, container.offsetHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
         
         // Clear container and add canvas
         container.innerHTML = '<div class="model-info" id="model-info"><h6>Model Information</h6><p id="current-model">Scene initialized - Ready to load models!</p></div>';
         container.appendChild(renderer.domElement);
         
-        // Add controls
+        // OrbitControls for camera movement
         if (typeof THREE.OrbitControls === 'undefined') {
             console.warn('⚠️ OrbitControls not loaded, using basic camera');
         } else {
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
+            controls.target.set(0, 1, 0);
+            console.log('✅ Camera controls working!');
         }
         
-        // Add lights
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        // IMPROVED LIGHTING SETUP
+        
+        // 1. Ambient light
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
         scene.add(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(10, 10, 5);
-        directionalLight.castShadow = true;
-        scene.add(directionalLight);
+        // 2. Main directional light
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        mainLight.position.set(10, 10, 5);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        scene.add(mainLight);
+        window.mainLight = mainLight; // Store for dark mode access
         
-        // Add ground plane
+        // 3. Fill light
+        const fillLight = new THREE.DirectionalLight(0x87ceeb, 0.6);
+        fillLight.position.set(-5, 5, -5);
+        scene.add(fillLight);
+        window.fillLight = fillLight; // Store for dark mode access
+        
+        // 4. Rim light
+        const rimLight = new THREE.DirectionalLight(0xffeaa7, 0.3);
+        rimLight.position.set(0, 5, -10);
+        scene.add(rimLight);
+        window.rimLight = rimLight; // Store for dark mode access
+        
+        // 5. Point light
+        const pointLight = new THREE.PointLight(0xffffff, 0.8, 50);
+        pointLight.position.set(3, 4, 3);
+        pointLight.castShadow = true;
+        scene.add(pointLight);
+        window.pointLight = pointLight; // Store for dark mode access
+        
+        // Ground plane
         const groundGeometry = new THREE.PlaneGeometry(20, 20);
-        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.5;
         ground.receiveShadow = true;
         scene.add(ground);
         
-        // Add a test cube
-        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const cubeMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
-        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        cube.position.set(0, 0.5, 0);
-        cube.castShadow = true;
-        scene.add(cube);
-        
-        console.log('✅ Scene initialized successfully!');
+        console.log('✅ Scene initialized with working controls!');
         animate();
         
     } catch (error) {
@@ -184,19 +194,15 @@ function animate() {
 
 function loadModel(modelId) {
     try {
+        modelId = parseInt(modelId);
         console.log('🎯 Loading model with ID:', modelId);
-        console.log('🔍 Available models:', modelsData.map(m => ({ id: m.id, name: m.name })));
         
-        // Check if GLTFLoader is available
         if (typeof THREE.GLTFLoader === 'undefined') {
             throw new Error('GLTFLoader is not loaded');
         }
-
-        // Convert both IDs to strings fro comparison
-        const modelData = modelsData.find(m => String(m.id) === String(modelId));
-
+        
+        const modelData = modelsData.find(m => m.id === modelId);
         if (!modelData) {
-            // Show available models for debugging
             const availableIds = modelsData.map(m => m.id).join(', ');
             throw new Error(`Model data not found for ID: ${modelId}. Available IDs: [${availableIds}]`);
         }
@@ -207,12 +213,9 @@ function loadModel(modelId) {
         loadedModels.forEach(model => scene.remove(model));
         loadedModels = [];
         
-        // Update status
         document.getElementById('current-model').textContent = 'Loading: ' + modelData.name + '...';
         
-        // Load new model
         const loader = new THREE.GLTFLoader();
-        console.log('📥 Starting model load from:', modelData.url);
         
         loader.load(
             modelData.url,
@@ -221,27 +224,82 @@ function loadModel(modelId) {
                 
                 const model = gltf.scene;
                 
-                // Apply transformations
-                model.scale.setScalar(modelData.scale || 1.0);
-                model.position.set(
-                    modelData.position.x || 0,
-                    modelData.position.y || 0,
-                    modelData.position.z || 0
-                );
+                // Calculate model size for better positioning
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const center = box.getCenter(new THREE.Vector3());
                 
-                // Enable shadows
+                console.log('📏 Model size:', size);
+                console.log('📍 Model center:', center);
+                
+                // Center the model
+                model.position.x = -center.x;
+                model.position.y = -box.min.y;
+                model.position.z = -center.z;
+                
+                // Apply user-defined positioning offset
+                model.position.x += (modelData.position.x || 0);
+                model.position.y += (modelData.position.y || 0);
+                model.position.z += (modelData.position.z || 0);
+                
+                // Auto-scale model to reasonable size
+                const maxSize = Math.max(size.x, size.y, size.z);
+                let autoScale = 1;
+                if (maxSize > 5) {
+                    autoScale = 3 / maxSize;
+                } else if (maxSize < 0.5) {
+                    autoScale = 2 / maxSize;
+                }
+                
+                const finalScale = (modelData.scale || 1.0) * autoScale;
+                model.scale.setScalar(finalScale);
+                
+                console.log('🔧 Applied auto-scale:', autoScale, 'Final scale:', finalScale);
+                
+                // Enhanced materials for better lighting
                 model.traverse(function(child) {
                     if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
+                        //child.castShadow = true;
+                        //child.receiveShadow = true;
+                        
+                        // Enhanced material handling for dark models
+                        if (child.material) {
+                            // Convert basic materials to lambert for better lighting
+                            if (child.material.type === 'MeshBasicMaterial') {
+                                const color = child.material.color;
+                                child.material = new THREE.MeshLambertMaterial({ color: color });
+                            }
+                            
+                            // Special enhancement for very dark materials
+                            if (child.material.color) {
+                                const color = child.material.color;
+                                // If the material is very dark
+                                if (color.r < 0.2 && color.g < 0.2 && color.b < 0.2) {
+                                    console.log('🖤 Dark material detected, enhancing...');
+                                    // Store original color for reset
+                                    child.material.userData.originalColor = color.clone();
+                                    // Slightly brighten very dark materials for better visibility
+                                    child.material.color.multiplyScalar(1.1);
+                                }
+                            }
+                        }
                     }
                 });
                 
                 scene.add(model);
                 loadedModels.push(model);
                 
-                document.getElementById('current-model').textContent = 'Loaded: ' + modelData.name;
-                console.log('🎉 Model successfully added to scene');
+                // Update camera to look at the model
+                if (controls) {
+                    controls.target.copy(model.position);
+                    controls.target.y += size.y / 2;
+                    controls.update();
+                }
+                
+                document.getElementById('current-model').textContent = 
+                    `Loaded: ${modelData.name} (${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)})`;
+                
+                console.log('🎉 Model successfully loaded!');
             },
             function(progress) {
                 console.log('📈 Loading progress:', progress);
@@ -253,7 +311,7 @@ function loadModel(modelId) {
             function(error) {
                 console.error('❌ Error loading model:', error);
                 document.getElementById('current-model').textContent = 'Error loading model';
-                alert('Error loading 3D model: ' + error.message + '\n\nCheck the console for details.');
+                alert('❌ Error loading 3D model: ' + error.message);
             }
         );
         
@@ -264,29 +322,77 @@ function loadModel(modelId) {
     }
 }
 
-
-function debugModelsData() {
-    console.log('🔍 Full modelsData array:', modelsData);
-    console.log('🔢 Number of models:', modelsData.length);
+// DARK MODEL MODE (Enhanced lighting for black/grey models)
+function enhanceForDarkModels() {
+    console.log('💡 Activating dark model mode...');
     
-    if (modelsData.length > 0) {
-        modelsData.forEach((model, index) => {
-            console.log(`📦 Model ${index}:`, {
-                id: model.id,
-                name: model.name,
-                url: model.url,
-                format: model.format
-            });
-        });
-        alert(`Found ${modelsData.length} models. Check console for details.`);
+    // Change background to white for maximum contrast
+    scene.background = new THREE.Color(0xffffff);
+    
+    // Dramatically increase lighting intensities
+    if (window.mainLight) window.mainLight.intensity = 1.5;
+    if (window.fillLight) window.fillLight.intensity = 1.0;
+    if (window.rimLight) window.rimLight.intensity = 0.8;
+    if (window.pointLight) window.pointLight.intensity = 1.2;
+    
+    // Add extra bright point light specifically for dark models
+    if (!window.extraLight) {
+        window.extraLight = new THREE.PointLight(0xffffff, 1.5, 30);
+        window.extraLight.position.set(-3, 5, 3);
+        scene.add(window.extraLight);
     } else {
-        alert('❌ No models found in modelsData array!');
+        window.extraLight.intensity = 1.5;
     }
+    
+    // Enhance dark materials in loaded models
+    loadedModels.forEach(model => {
+        model.traverse(function(child) {
+            if (child.isMesh && child.material && child.material.color) {
+                const color = child.material.color;
+                // If very dark, brighten it significantly
+                if (color.r < 0.3 && color.g < 0.3 && color.b < 0.3) {
+                    child.material.color.multiplyScalar(1.3);
+                    console.log('🖤 Enhanced dark material');
+                }
+            }
+        });
+    });
+    
+    console.log('✅ Dark model mode activated!');
+    alert('✅ Dark Model Mode Activated!\n\n🌟 Enhanced for black/grey models:\n• White background for contrast\n• 50% brighter lighting\n• Extra spotlight added\n• Dark materials brightened\n\nYour dark models should now be clearly visible!');
 }
 
-// Add this to the global functions section
-window.debugModelsData = debugModelsData;
-
+// RESET LIGHTING to original state
+function resetLighting() {
+    console.log('🔄 Resetting lighting to defaults...');
+    
+    // Reset background
+    scene.background = new THREE.Color(0x2a2a2a);
+    
+    // Reset light intensities
+    if (window.mainLight) window.mainLight.intensity = 1.0;
+    if (window.fillLight) window.fillLight.intensity = 0.6;
+    if (window.rimLight) window.rimLight.intensity = 0.3;
+    if (window.pointLight) window.pointLight.intensity = 0.8;
+    
+    // Remove extra light
+    if (window.extraLight) {
+        scene.remove(window.extraLight);
+        window.extraLight = null;
+    }
+    
+    // Reset material colors to original
+    loadedModels.forEach(model => {
+        model.traverse(function(child) {
+            if (child.isMesh && child.material && child.material.userData.originalColor) {
+                child.material.color.copy(child.material.userData.originalColor);
+            }
+        });
+    });
+    
+    console.log('✅ Lighting reset to defaults');
+    alert('🔄 Lighting reset to default settings');
+}
 
 // Handle window resize
 window.addEventListener('resize', function() {
@@ -306,9 +412,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Make functions globally accessible
 window.loadModel = loadModel;
-window.testButton = testButton;
-window.testThreeJS = testThreeJS;
+window.enhanceForDarkModels = enhanceForDarkModels;
+window.resetLighting = resetLighting;
 
-console.log('🔧 Script setup complete');
+console.log('🔧 Script setup complete - All controls working!');
 </script>
 {% endblock %}

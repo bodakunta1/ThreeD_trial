@@ -9,11 +9,7 @@ def home(request):
     """Main viewer page with all 3D models"""
     models = ThreeDModel.objects.all()
 
-     # Debug: Print models in console
-    print(f"🔍 Found {models.count()} models in database:")
-    for model in models:
-        print(f"  - ID: {model.id}, Name: {model.name}, File: {model.model_file.url}")
-    
+     
     # Prepare models data for JavaScript
     models_data = []
     for model in models:
@@ -50,3 +46,4 @@ def upload_model(request):
         form = ModelUploadForm()
     
     return render(request, 'viewer/upload.html', {'form': form})
+
